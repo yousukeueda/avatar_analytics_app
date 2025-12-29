@@ -187,146 +187,108 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
         }
       },
       child: Scaffold(
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              _buildAppBar(innerBoxIsScrolled),
-              _buildTabBar(),
-            ];
-          },
-          body: TabBarView(
-            controller: _tabController,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              BasicInfoTab(
-                avatar: _editingAvatar,
-                onUpdate: _updateAvatar,
-              ),
-              VisualTab(
-                avatar: _editingAvatar,
-                onUpdate: _updateAvatar,
-              ),
-              CharacterTab(
-                avatar: _editingAvatar,
-                onUpdate: _updateAvatar,
-              ),
-              AISettingsTab(
-                avatar: _editingAvatar,
-                onUpdate: _updateAvatar,
-              ),
-              VoiceSettingsTab(
-                avatar: _editingAvatar,
-                onUpdate: _updateAvatar,
-              ),
-              SocialLinksTab(
-                avatar: _editingAvatar,
-                onUpdate: _updateAvatar,
-              ),
-            ],
+        appBar: AppBar(
+          backgroundColor: AppColors.background,
+          leading: IconButton(
+            icon: const Icon(LucideIcons.arrowLeft),
+            onPressed: () async {
+              if (!_hasChanges || await _onWillPop()) {
+                if (mounted) Navigator.of(context).pop();
+              }
+            },
           ),
-        ),
-        bottomNavigationBar: _buildBottomBar(),
-      ),
-    );
-  }
-
-  Widget _buildAppBar(bool innerBoxIsScrolled) {
-    return SliverAppBar(
-      expandedHeight: 120,
-      floating: false,
-      pinned: true,
-      forceElevated: innerBoxIsScrolled,
-      backgroundColor: AppColors.background,
-      leading: IconButton(
-        icon: const Icon(LucideIcons.arrowLeft),
-        onPressed: () async {
-          if (!_hasChanges || await _onWillPop()) {
-            if (mounted) Navigator.of(context).pop();
-          }
-        },
-      ),
-      actions: [
-        if (!_isNewAvatar)
-          PopupMenuButton<String>(
-            icon: const Icon(LucideIcons.moreVertical),
-            onSelected: _handleMenuAction,
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'duplicate',
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.copy, size: 18),
-                    SizedBox(width: 12),
-                    Text('複製'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.trash2, size: 18, color: AppColors.error),
-                    SizedBox(width: 12),
-                    Text('削除', style: TextStyle(color: AppColors.error)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.only(left: 56, bottom: 16),
-        title: Text(
-          _isNewAvatar ? '新規アバター作成' : _editingAvatar.name,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primary.withOpacity(0.3),
-                AppColors.background,
-              ],
+          title: Text(
+            _isNewAvatar ? '新規アバター作成' : _editingAvatar.name,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return SliverPersistentHeader(
-      pinned: true,
-      delegate: _TabBarDelegate(
-        TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-          indicatorSize: TabBarIndicatorSize.label,
-          dividerColor: Colors.transparent,
-          indicator: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: AppColors.primary.withOpacity(0.2),
-          ),
-          tabs: _tabs.map((tab) {
-            return Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(tab.icon, size: 18),
-                  const SizedBox(width: 8),
-                  Text(tab.label),
+          actions: [
+            if (!_isNewAvatar)
+              PopupMenuButton<String>(
+                icon: const Icon(LucideIcons.moreVertical),
+                onSelected: _handleMenuAction,
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'duplicate',
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.copy, size: 18),
+                        SizedBox(width: 12),
+                        Text('複製'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(LucideIcons.trash2, size: 18, color: AppColors.error),
+                        SizedBox(width: 12),
+                        Text('削除', style: TextStyle(color: AppColors.error)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            );
-          }).toList(),
+          ],
+          bottom: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+            indicatorSize: TabBarIndicatorSize.label,
+            dividerColor: Colors.transparent,
+            indicator: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: AppColors.primary.withOpacity(0.2),
+            ),
+            tabs: _tabs.map((tab) {
+              return Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(tab.icon, size: 18),
+                    const SizedBox(width: 8),
+                    Text(tab.label),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
         ),
+        body: TabBarView(
+          controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            BasicInfoTab(
+              avatar: _editingAvatar,
+              onUpdate: _updateAvatar,
+            ),
+            VisualTab(
+              avatar: _editingAvatar,
+              onUpdate: _updateAvatar,
+            ),
+            CharacterTab(
+              avatar: _editingAvatar,
+              onUpdate: _updateAvatar,
+            ),
+            AISettingsTab(
+              avatar: _editingAvatar,
+              onUpdate: _updateAvatar,
+            ),
+            VoiceSettingsTab(
+              avatar: _editingAvatar,
+              onUpdate: _updateAvatar,
+            ),
+            SocialLinksTab(
+              avatar: _editingAvatar,
+              onUpdate: _updateAvatar,
+            ),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomBar(),
       ),
     );
   }
@@ -519,30 +481,4 @@ class _TabDefinition {
   final String label;
 
   _TabDefinition({required this.icon, required this.label});
-}
-
-class _TabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-
-  _TabBarDelegate(this.tabBar);
-
-  @override
-  Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: AppColors.background,
-      child: tabBar,
-    );
-  }
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-
-  @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
-    return false;
-  }
 }
