@@ -224,6 +224,7 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
       selectedColor: AppColors.primary,
       labelStyle: TextStyle(
         color: isSelected ? Colors.white : AppColors.textPrimary,
+        decoration: TextDecoration.none,
       ),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),

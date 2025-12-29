@@ -196,6 +196,7 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
           },
           body: TabBarView(
             controller: _tabController,
+            physics: const NeverScrollableScrollPhysics(),
             children: [
               BasicInfoTab(
                 avatar: _editingAvatar,
