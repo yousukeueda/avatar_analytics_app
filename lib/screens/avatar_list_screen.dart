@@ -205,34 +205,36 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
 
   Widget _buildFilterChip(AvatarStatus? status, String label, IconData icon) {
     final isSelected = _filterStatus == status;
-    return FilterChip(
-      selected: isSelected,
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isSelected ? Colors.white : AppColors.textSecondary,
+    return GestureDetector(
+      onTap: () => setState(() => _filterStatus = status),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.surfaceLight,
           ),
-          const SizedBox(width: 6),
-          Text(label),
-        ],
-      ),
-      onSelected: (_) => setState(() => _filterStatus = status),
-      backgroundColor: AppColors.surface,
-      selectedColor: AppColors.primary,
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : AppColors.textPrimary,
-        decoration: TextDecoration.none,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isSelected ? AppColors.primary : AppColors.surfaceLight,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ),
       ),
-      showCheckmark: false,
     );
   }
 
