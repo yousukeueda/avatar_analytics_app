@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/avatar.dart';
 import '../config/theme.dart';
+import '../providers/avatar_provider.dart';
 import 'avatar_edit_screen.dart';
 
 /// アバター一覧画面
@@ -16,106 +17,131 @@ class AvatarListScreen extends ConsumerStatefulWidget {
 
 class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
   AvatarStatus? _filterStatus;
-  
-  // TODO: Replace with actual data from Riverpod provider
-  final List<Avatar> _mockAvatars = [
-    Avatar(
-      id: '1',
-      name: '織田信長',
-      country: '日本',
-      language: 'ja',
-      era: '戦国時代',
-      title: '天下統一を目指した革命児',
-      status: AvatarStatus.active,
-      visual: AvatarVisual(
-        profileImageUrl: 'https://picsum.photos/200?random=1',
-      ),
-      character: AvatarCharacter(
-        personality: ['野心的', '革新的', '短気'],
-        firstPerson: 'わし',
-        catchphrases: ['是非もなし', 'であるか'],
-      ),
-    ),
-    Avatar(
-      id: '2',
-      name: 'Napoleon Bonaparte',
-      country: 'フランス',
-      language: 'fr',
-      era: '19世紀',
-      title: 'フランス皇帝',
-      status: AvatarStatus.draft,
-      visual: AvatarVisual(
-        profileImageUrl: 'https://picsum.photos/200?random=2',
-      ),
-      character: AvatarCharacter(
-        personality: ['戦略的', '野心的', 'カリスマ'],
-        firstPerson: 'Je',
-      ),
-    ),
-    Avatar(
-      id: '3',
-      name: 'Cleopatra',
-      country: 'エジプト',
-      language: 'en',
-      era: '古代',
-      title: '最後のファラオ',
-      status: AvatarStatus.inactive,
-      visual: AvatarVisual(
-        profileImageUrl: 'https://picsum.photos/200?random=3',
-      ),
-      character: AvatarCharacter(
-        personality: ['知的', '魅力的', '政治的'],
-      ),
-    ),
-  ];
-
-  List<Avatar> get _filteredAvatars {
-    if (_filterStatus == null) return _mockAvatars;
-    return _mockAvatars.where((a) => a.status == _filterStatus).toList();
-  }
 
   @override
   Widget build(BuildContext context) {
+    final avatarState = ref.watch(avatarListProvider);
+    final filteredAvatars = _filterStatus == null
+        ? avatarState.avatars
+        : avatarState.avatars.where((a) => a.status == _filterStatus).toList();
+
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // ヘッダー
-          SliverToBoxAdapter(
-            child: _buildHeader(),
-          ),
-          
-          // フィルターチップ
-          SliverToBoxAdapter(
-            child: _buildFilterChips(),
-          ),
-          
-          // アバターグリッド
-          SliverPadding(
-            padding: const EdgeInsets.all(AppConstants.paddingMD),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 400,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 0.85,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildAvatarCard(_filteredAvatars[index]),
-                childCount: _filteredAvatars.length,
-              ),
-            ),
-          ),
-        ],
-      ),
+      body: avatarState.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : avatarState.error != null
+              ? _buildErrorState(avatarState.error!)
+              : CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _buildHeader(avatarState.avatars.length),
+                    ),
+                    SliverToBoxAdapter(
+                      child: _buildFilterChips(),
+                    ),
+                    if (filteredAvatars.isEmpty)
+                      SliverToBoxAdapter(
+                        child: _buildEmptyState(),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.all(AppConstants.paddingMD),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 400,
+                            mainAxisSpacing: 16,
+                            crossAxisSpacing: 16,
+                            childAspectRatio: 0.85,
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) =>
+                                _buildAvatarCard(filteredAvatars[index]),
+                            childCount: filteredAvatars.length,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _navigateToCreate(),
+        onPressed: () => _createNewAvatar(),
         icon: const Icon(LucideIcons.plus),
         label: const Text('新規作成'),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            LucideIcons.alertCircle,
+            size: 48,
+            color: AppColors.error,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'エラーが発生しました',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textMuted,
+                ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () {
+              ref.read(avatarListProvider.notifier).loadAvatars();
+            },
+            icon: const Icon(LucideIcons.refreshCw),
+            label: const Text('再読み込み'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(48),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              LucideIcons.users,
+              size: 64,
+              color: AppColors.textMuted.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _filterStatus == null
+                  ? 'アバターがありません'
+                  : '該当するアバターがありません',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _filterStatus == null
+                  ? '新しいアバターを作成してください'
+                  : 'フィルターを変更してください',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(int totalCount) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
       child: Column(
@@ -145,7 +171,7 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${_mockAvatars.length}体のアバターを管理中',
+                    '$totalCount体のアバターを管理中',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -165,11 +191,13 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
         children: [
           _buildFilterChip(null, 'すべて', LucideIcons.layoutGrid),
           const SizedBox(width: 8),
-          _buildFilterChip(AvatarStatus.active, '公開中', LucideIcons.checkCircle),
+          _buildFilterChip(
+              AvatarStatus.active, '公開中', LucideIcons.checkCircle),
           const SizedBox(width: 8),
           _buildFilterChip(AvatarStatus.draft, '準備中', LucideIcons.pencil),
           const SizedBox(width: 8),
-          _buildFilterChip(AvatarStatus.inactive, '停止中', LucideIcons.pauseCircle),
+          _buildFilterChip(
+              AvatarStatus.inactive, '停止中', LucideIcons.pauseCircle),
         ],
       ),
     );
@@ -222,12 +250,10 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 画像エリア
             Expanded(
               flex: 3,
               child: Stack(
                 children: [
-                  // プロフィール画像
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
@@ -246,12 +272,11 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
                                 ),
                               ),
                             ),
-                            errorWidget: (context, url, error) => _buildPlaceholder(),
+                            errorWidget: (context, url, error) =>
+                                _buildPlaceholder(),
                           )
                         : _buildPlaceholder(),
                   ),
-                  
-                  // グラデーションオーバーレイ
                   Positioned.fill(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
@@ -270,22 +295,16 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
                       ),
                     ),
                   ),
-                  
-                  // ステータスバッジ
                   Positioned(
                     top: 12,
                     right: 12,
                     child: _buildStatusBadge(avatar.status),
                   ),
-                  
-                  // 言語バッジ
                   Positioned(
                     top: 12,
                     left: 12,
                     child: _buildLanguageBadge(avatar.language),
                   ),
-                  
-                  // 名前（画像上）
                   Positioned(
                     bottom: 12,
                     left: 12,
@@ -308,8 +327,6 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
                 ],
               ),
             ),
-            
-            // 情報エリア
             Expanded(
               flex: 2,
               child: Padding(
@@ -317,7 +334,6 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 時代と国
                     Row(
                       children: [
                         Icon(
@@ -329,28 +345,23 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
                         Expanded(
                           child: Text(
                             '${avatar.country} · ${avatar.era}',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textMuted,
-                            ),
+                            style:
+                                Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: AppColors.textMuted,
+                                    ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                    
                     const SizedBox(height: 8),
-                    
-                    // タイトル/説明
                     Text(
                       avatar.title,
                       style: Theme.of(context).textTheme.bodyMedium,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    
                     const Spacer(),
-                    
-                    // 性格タグ
                     if (avatar.character.personality.isNotEmpty)
                       Wrap(
                         spacing: 6,
@@ -444,14 +455,27 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
     );
   }
 
-  ({Color color, IconData icon, String label}) _getStatusConfig(AvatarStatus status) {
+  ({Color color, IconData icon, String label}) _getStatusConfig(
+      AvatarStatus status) {
     switch (status) {
       case AvatarStatus.active:
-        return (color: AppColors.success, icon: LucideIcons.checkCircle, label: '公開中');
+        return (
+          color: AppColors.success,
+          icon: LucideIcons.checkCircle,
+          label: '公開中'
+        );
       case AvatarStatus.draft:
-        return (color: AppColors.warning, icon: LucideIcons.pencil, label: '準備中');
+        return (
+          color: AppColors.warning,
+          icon: LucideIcons.pencil,
+          label: '準備中'
+        );
       case AvatarStatus.inactive:
-        return (color: AppColors.textMuted, icon: LucideIcons.pauseCircle, label: '停止中');
+        return (
+          color: AppColors.textMuted,
+          icon: LucideIcons.pauseCircle,
+          label: '停止中'
+        );
     }
   }
 
@@ -478,12 +502,33 @@ class _AvatarListScreenState extends ConsumerState<AvatarListScreen> {
     }
   }
 
-  void _navigateToCreate() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const AvatarEditScreen(),
-      ),
-    );
+  Future<void> _createNewAvatar() async {
+    try {
+      final newAvatar =
+          await ref.read(avatarListProvider.notifier).createAvatar();
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => AvatarEditScreen(avatar: newAvatar),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(LucideIcons.alertCircle, color: AppColors.error),
+                const SizedBox(width: 12),
+                Text('作成に失敗しました: $e'),
+              ],
+            ),
+            backgroundColor: AppColors.surface,
+          ),
+        );
+      }
+    }
   }
 
   void _navigateToEdit(Avatar avatar) {

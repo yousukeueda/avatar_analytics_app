@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../models/avatar.dart';
 import '../config/theme.dart';
+import '../providers/avatar_provider.dart';
 import 'tabs/basic_info_tab.dart';
 import 'tabs/visual_tab.dart';
 import 'tabs/character_tab.dart';
@@ -27,7 +28,6 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
   bool _hasChanges = false;
   bool _isSaving = false;
 
-  // 各タブの定義
   final List<_TabDefinition> _tabs = [
     _TabDefinition(
       icon: LucideIcons.fileText,
@@ -72,7 +72,7 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
     super.dispose();
   }
 
-  bool get _isNewAvatar => widget.avatar == null;
+  bool get _isNewAvatar => widget.avatar == null || widget.avatar!.name.isEmpty;
 
   void _updateAvatar(Avatar updatedAvatar) {
     setState(() {
@@ -90,9 +90,9 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
     setState(() => _isSaving = true);
 
     try {
-      // TODO: Implement actual save logic with repository
-      await Future.delayed(const Duration(seconds: 1)); // Simulated delay
-      
+      final notifier = ref.read(avatarListProvider.notifier);
+      await notifier.updateAvatar(_editingAvatar);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -106,6 +106,7 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
             backgroundColor: AppColors.surface,
           ),
         );
+        setState(() => _hasChanges = false);
         Navigator.of(context).pop();
       }
     } catch (e) {
@@ -124,7 +125,22 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
           children: [
             const Icon(LucideIcons.alertCircle, color: AppColors.error),
             const SizedBox(width: 12),
-            Text(message),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: AppColors.surface,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(LucideIcons.checkCircle, color: AppColors.success),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
           ],
         ),
         backgroundColor: AppColors.surface,
@@ -161,8 +177,15 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && mounted) {
+          Navigator.of(context).pop();
+        }
+      },
       child: Scaffold(
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -216,7 +239,7 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
       leading: IconButton(
         icon: const Icon(LucideIcons.arrowLeft),
         onPressed: () async {
-          if (await _onWillPop()) {
+          if (!_hasChanges || await _onWillPop()) {
             if (mounted) Navigator.of(context).pop();
           }
         },
@@ -326,15 +349,11 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
       ),
       child: Row(
         children: [
-          // ステータス表示
           if (!_isNewAvatar)
             Expanded(
               child: _buildStatusSelector(),
             ),
-          
           const SizedBox(width: 16),
-          
-          // 保存ボタン
           SizedBox(
             height: 48,
             child: ElevatedButton(
@@ -400,14 +419,27 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
     );
   }
 
-  ({Color color, IconData icon, String label}) _getStatusConfig(AvatarStatus status) {
+  ({Color color, IconData icon, String label}) _getStatusConfig(
+      AvatarStatus status) {
     switch (status) {
       case AvatarStatus.active:
-        return (color: AppColors.success, icon: LucideIcons.checkCircle, label: '公開中');
+        return (
+          color: AppColors.success,
+          icon: LucideIcons.checkCircle,
+          label: '公開中'
+        );
       case AvatarStatus.draft:
-        return (color: AppColors.warning, icon: LucideIcons.pencil, label: '準備中');
+        return (
+          color: AppColors.warning,
+          icon: LucideIcons.pencil,
+          label: '準備中'
+        );
       case AvatarStatus.inactive:
-        return (color: AppColors.textMuted, icon: LucideIcons.pauseCircle, label: '停止中');
+        return (
+          color: AppColors.textMuted,
+          icon: LucideIcons.pauseCircle,
+          label: '停止中'
+        );
     }
   }
 
@@ -422,17 +454,23 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
     }
   }
 
-  void _duplicateAvatar() {
-    final duplicated = _editingAvatar.copyWith(
-      id: '',
-      name: '${_editingAvatar.name} (コピー)',
-      status: AvatarStatus.draft,
-    );
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => AvatarEditScreen(avatar: duplicated),
-      ),
-    );
+  Future<void> _duplicateAvatar() async {
+    try {
+      final duplicated = await ref
+          .read(avatarListProvider.notifier)
+          .duplicateAvatar(_editingAvatar);
+
+      if (mounted) {
+        _showSuccess('アバターを複製しました');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => AvatarEditScreen(avatar: duplicated),
+          ),
+        );
+      }
+    } catch (e) {
+      _showError('複製に失敗しました: $e');
+    }
   }
 
   Future<void> _confirmDelete() async {
@@ -440,7 +478,8 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('アバターを削除'),
-        content: Text('「${_editingAvatar.name}」を削除してもよろしいですか？\nこの操作は取り消せません。'),
+        content: Text(
+            '「${_editingAvatar.name}」を削除してもよろしいですか？\nこの操作は取り消せません。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -458,8 +497,18 @@ class _AvatarEditScreenState extends ConsumerState<AvatarEditScreen>
     );
 
     if (result == true && mounted) {
-      // TODO: Implement actual delete logic
-      Navigator.of(context).pop();
+      try {
+        await ref
+            .read(avatarListProvider.notifier)
+            .deleteAvatar(_editingAvatar.id);
+
+        if (mounted) {
+          _showSuccess('アバターを削除しました');
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        _showError('削除に失敗しました: $e');
+      }
     }
   }
 }
